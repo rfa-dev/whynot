@@ -1,0 +1,67 @@
+{% extends "layout.html" %}
+
+{%- block title -%}
+        <title>{{ item.headlines }} - WHYNOT</title>
+{%- endblock -%}
+
+{% block main %}
+        <div class="news-article">
+            <div class="article-header">
+                <h1 class="headline">{{ item.headlines }}</h1>
+                <div class="meta">
+                    <span class="date">{{ item.display_date }}</span>
+                    {%- if let Some(a) = author %}
+                    <span class="author">{{ a }}</span>
+                    {%- endif %}
+                    <span class="source"><a href="https://wainao.me{{ item.website_url }}" target="_blank">Source</a></span>
+                </div>
+                <div>
+                    <a href="{{ item.section.0 }}" class="section-link">{{ item.section.1 }}</a>
+                </div>
+            </div>
+
+            {% if let Some(img) = item.promo_img %}
+            <div class="cover">
+                <img
+                    src="{{ img }}"
+                    class="cover-img"
+                    loading="lazy"
+                    {% if let Some(caption) = item.caption %}
+                    alt="{{ caption }}"
+                    title="{{ caption }}"
+                    {% endif %}
+                />
+                {% if let Some(caption) = item.caption -%}
+                <div class="caption">{{ caption }}</div>
+                {%- endif %}
+            </div>
+            {% endif %}
+
+            <div class="article-body">
+            {%- for content in contents %}
+                {%- match content %}
+                {%- when crate::ContentType::Text with (text) %}
+                <p class="paragraph">{{ text }}</p>
+                {%- when crate::ContentType::Header with (header) %}
+                <h2 class="subhead">{{ header }}</h2>
+                {%- when crate::ContentType::Image with (url, caption) %}
+                <figure class="article-img">
+                    <img src="{{ url }}" alt="{{ caption }}" loading="lazy" />
+                    <figcaption>{{ caption }}</figcaption>
+                </figure>
+                {%- when crate::ContentType::Link with (content, url) %}
+                <div>
+                    ↩ <a href="{{ url }}" target="_blank">{{ content }}</a>
+                </div>
+                {%- when crate::ContentType::RawHtml with (content) %}
+                <div>{{ content }}</div>
+                {%- when crate::ContentType::Quote with (content) %}
+                <blockquote>{{ content }}</blockquote>
+                {%- when crate::ContentType::CustomEmbed with (url) %}
+                <div><a href="{{ url }}">{{ url }}</a></div>
+                {%- when crate::ContentType::Other %}
+                {%- endmatch %}
+            {%- endfor %}
+            </div>
+        </div>
+{% endblock %}

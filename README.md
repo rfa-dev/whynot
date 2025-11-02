@@ -1,1 +1,3 @@
 # whynot
+
+https://wainao.me/
