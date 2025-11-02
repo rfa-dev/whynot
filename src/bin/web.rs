@@ -150,6 +150,8 @@ struct Article {
     item: Item,
     author: Option<String>,
     contents: Vec<ContentType>,
+    topics: Vec<(String, String)>,
+    tags: Vec<(String, String)>,
 }
 
 impl From<&Value> for Article {
@@ -256,11 +258,27 @@ impl From<&Value> for Article {
             }
         }
 
+        let mut topics = vec![];
+        let mut tags = vec![];
+        if let Some(sections) = json["taxonomy"]["sections"].as_array() {
+            for section in sections {
+                let path = section["path"].as_str().unwrap().to_owned();
+                let name = section["name"].as_str().unwrap().to_owned();
+                if path.starts_with("/topics") {
+                    topics.push((path, name));
+                } else if path.starts_with("/tags") {
+                    tags.push((path, name));
+                }
+            }
+        }
+
         Self {
             site,
             item,
             author,
             contents,
+            topics,
+            tags,
         }
     }
 }
@@ -372,7 +390,7 @@ impl From<&Value> for Item {
                 .unwrap_or_default()
                 .to_owned();
         }
-
+        
         Item {
             headlines,
             display_date,

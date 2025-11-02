@@ -17,6 +17,14 @@
                 </div>
                 <div>
                     <a href="{{ item.section.0 }}" class="section-link">{{ item.section.1 }}</a>
+                    {%- for (url, name) in topics %}
+                    <a href="{{ url }}"  class="section-link"> 🏷️{{ name }}</a>
+                    {%- endfor %}
+                </div>
+                <div>
+                    {%- for (url, name) in tags %}
+                    <a href="{{ url }}"  class="section-link">{{ name }}</a>
+                    {%- endfor %}
                 </div>
             </div>
 
