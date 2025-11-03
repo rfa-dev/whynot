@@ -109,7 +109,7 @@ async fn page(
             }
             let (k, _) = i.unwrap();
             let website_key = &k[len + 8..];
-            let v2 = state.db.get(&website_key).unwrap().unwrap();
+            let v2 = state.db.get(website_key).unwrap().unwrap();
             let json: Value = serde_json::from_slice(&v2).unwrap();
             let item: Item = (&json).into();
             items.push(item);
@@ -226,18 +226,14 @@ impl From<&Value> for Article {
                         let mut content;
                         if let Some(content_elements) = c["content_elements"].as_array() {
                             for i in content_elements {
-                                if let Some(i_type) = i["type"].as_str() {
-                                    if i_type == "text" {
-                                        content =
-                                            i["content"].as_str().unwrap_or_default().to_owned();
-                                        if !content.is_empty() {
-                                            contents.push(ContentType::Quote(content))
-                                        } else {
-                                            warn!(
-                                                "{} -> unknown content type: {c}",
-                                                item.website_url
-                                            )
-                                        }
+                                if let Some(i_type) = i["type"].as_str()
+                                    && i_type == "text"
+                                {
+                                    content = i["content"].as_str().unwrap_or_default().to_owned();
+                                    if !content.is_empty() {
+                                        contents.push(ContentType::Quote(content))
+                                    } else {
+                                        warn!("{} -> unknown content type: {c}", item.website_url)
                                     }
                                 }
                             }
@@ -317,7 +313,7 @@ async fn list(
         }
     }
 
-    let url_path = format!("/");
+    let url_path = "/".to_owned();
     let page_list = PageList {
         items,
         page,
