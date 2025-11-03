@@ -28,8 +28,8 @@ struct Args {
     #[arg(short, long, default_value = "127.0.0.1:3334")]
     addr: String,
 
-    /// data folder, containing imgs/ and wainao.db/
-    #[arg(short = 'd', long, default_value = "wainao")]
+    /// data folder, containing imgs/ and whynot.db/
+    #[arg(short = 'd', long, default_value = "whynot_data")]
     data: String,
 }
 
@@ -43,11 +43,11 @@ async fn main() {
         .init();
 
     let folder = PathBuf::from(&ARGS.data);
-    let db_folder = folder.join("wainao.db");
+    let db_folder = folder.join("whynot.db");
 
     let keyspace = Config::new(db_folder).open().unwrap();
     let db = keyspace
-        .open_partition("wainao", kv_sep_partition_option())
+        .open_partition("whynot", kv_sep_partition_option())
         .unwrap();
     let index = keyspace
         .open_partition("index", PartitionCreateOptions::default())
@@ -138,7 +138,7 @@ enum ContentType {
     Link(String, String),
     RawHtml(String),
     Quote(String),
-    CustomEmbed(String),
+    CustomEmbed(String, String),
     #[allow(dead_code)]
     Other,
 }
@@ -174,6 +174,7 @@ impl From<&Value> for Article {
             .map(|s| s.to_owned());
 
         let mut contents = vec![];
+        let mut has_article = false;
         if let Some(content_elements) = json["content_elements"].as_array() {
             for c in content_elements {
                 match c["type"].as_str().unwrap() {
@@ -209,14 +210,16 @@ impl From<&Value> for Article {
                         contents.push(ContentType::Link(content, url));
                     }
                     "raw_html" => {
-                        let content = c["content"]
-                            .as_str()
-                            .unwrap()
-                            .trim_start_matches("<noscript>")
-                            .trim_end_matches("</noscript>")
-                            .trim();
-                        if !content.is_empty() {
-                            contents.push(ContentType::RawHtml(content.to_owned()))
+                        if !has_article {
+                            let content = c["content"]
+                                .as_str()
+                                .unwrap()
+                                .trim_start_matches("<noscript>")
+                                .trim_end_matches("</noscript>")
+                                .trim();
+                            if !content.is_empty() {
+                                contents.push(ContentType::RawHtml(content.to_owned()))
+                            }
                         }
                     }
                     "quote" => {
@@ -242,14 +245,19 @@ impl From<&Value> for Article {
                     }
                     "custom_embed" => {
                         let mut url = String::new();
+                        let mut content = String::new();
                         if let Some(config) = c["embed"]["config"].as_object() {
                             if let Some(u) = config.get("shorthandScript") {
                                 url = u.as_str().unwrap().to_owned();
                             } else if let Some(u) = config.get("url") {
                                 url = u.as_str().unwrap().to_owned();
                             }
+                            if let Some(c) = c.get("article") {
+                                content = c.as_str().unwrap().to_owned();
+                                has_article = true;
+                            }
                         }
-                        contents.push(ContentType::CustomEmbed(url))
+                        contents.push(ContentType::CustomEmbed(url, content));
                     }
                     _ => {
                         warn!("{} -> unknown content type: {c}", item.website_url)
@@ -260,6 +268,7 @@ impl From<&Value> for Article {
 
         let mut topics = vec![];
         let mut tags = vec![];
+
         if let Some(sections) = json["taxonomy"]["sections"].as_array() {
             for section in sections {
                 let path = section["path"].as_str().unwrap().to_owned();
@@ -390,7 +399,6 @@ impl From<&Value> for Item {
                 .unwrap_or_default()
                 .to_owned();
         }
-        
         Item {
             headlines,
             display_date,

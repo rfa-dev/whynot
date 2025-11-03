@@ -34,7 +34,7 @@ struct Args {
     /// proxy (e.g., http://127.0.0.1:8089)
     #[clap(long)]
     proxy: Option<String>,
-    #[arg(short = 'o', long, default_value = "wainao")]
+    #[arg(short = 'o', long, default_value = "whynot_data")]
     output: String,
 }
 
@@ -54,9 +54,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         create_dir_all(img_path)?;
     }
 
-    let keyspace = Config::new("wainao.db").open().unwrap();
+    let keyspace = Config::new("whynot.db").open().unwrap();
     let db = keyspace
-        .open_partition("wainao", kv_sep_partition_option())
+        .open_partition("whynot", kv_sep_partition_option())
         .unwrap();
     let index = keyspace
         .open_partition("index", PartitionCreateOptions::default())
@@ -79,13 +79,13 @@ async fn fetch_section(
     section: &str,
 ) {
     let mut offset = 0;
-    let (count, items) = fetch_story_list(offset, section).await.unwrap();
-    batch_dl(&items, keyspace, db, index, tags).await;
+    let (count, mut items) = fetch_story_list(offset, section).await.unwrap();
+    batch_dl(&mut items, keyspace, db, index, tags).await;
 
     offset += items.len();
     while offset < count {
-        let (_, items) = fetch_story_list(offset, section).await.unwrap();
-        batch_dl(&items, keyspace, db, index, tags).await;
+        let (_, mut items) = fetch_story_list(offset, section).await.unwrap();
+        batch_dl(&mut items, keyspace, db, index, tags).await;
         offset += items.len();
     }
 }
@@ -93,14 +93,14 @@ async fn fetch_section(
 const CDN_DOMAIN: &str = "https://cloudfront-us-east-1.images.arcpublishing.com/radiofreeasia/";
 
 async fn batch_dl(
-    items: &Vec<Value>,
+    items: &mut Vec<Value>,
     keyspace: &Keyspace,
     db: &PartitionHandle,
     index: &PartitionHandle,
     tags: &PartitionHandle,
 ) {
     let mut batch = keyspace.batch();
-    for item in items {
+    for item in items.iter_mut() {
         let mut imgs = HashSet::new();
         if let Some(img_url) = item["promo_items"]["basic"]["url"].as_str() {
             imgs.insert(img_url.to_owned());
@@ -125,6 +125,39 @@ async fn batch_dl(
                 info!("Downloaded image: {}", img_url);
             } else {
                 info!("Image already exists: {}", img_path.display());
+            }
+        }
+
+        if let Some(content_elements) = item["content_elements"].as_array_mut() {
+            for c in content_elements.iter_mut() {
+                if c["type"].as_str().unwrap() == "custom_embed" {
+                    let mut url = String::new();
+                    if let Some(config) = c["embed"]["config"].as_object() {
+                        if let Some(u) = config.get("shorthandScript") {
+                            url = u.as_str().unwrap().to_owned();
+                        } else if let Some(u) = config.get("url") {
+                            url = u.as_str().unwrap().to_owned();
+                        }
+                        if url.is_empty() {
+                            continue;
+                        }
+                        let (article, img_urls) = extract_article(&url).await;
+                        for (img_url, img_path) in img_urls {
+                            if !Path::new(&img_path).exists() {
+                                dl_obj(&img_url, &img_path).await.unwrap();
+                                info!("Downloaded image: {}", img_url);
+                            } else {
+                                info!("Image already exists: {}", img_path.display());
+                            }
+                        }
+
+                        if !article.is_empty() {
+                            c.as_object_mut()
+                                .unwrap()
+                                .insert("article".to_owned(), Value::String(article));
+                        }
+                    }
+                }
             }
         }
 
@@ -193,4 +226,81 @@ async fn dl_obj(url: &str, path: &Path) -> Result<(), reqwest::Error> {
     let bytes = resp.bytes().await?;
     std::fs::write(path, &bytes).unwrap();
     Ok(())
+}
+
+#[instrument]
+async fn extract_article(web_url: &str) -> (String, Vec<(String, PathBuf)>) {
+    let resp = CLIENT.get(web_url).send().await.unwrap();
+    info!("Status: {}", resp.status());
+    let html = resp.text().await.unwrap();
+    let document = scraper::Html::parse_document(&html);
+    let selector = scraper::Selector::parse(
+        "h2.Theme-Layer-BodyText-Heading-Large, 
+        div.Theme-Caption.Layout,
+        picture,
+        p",
+    )
+    .unwrap();
+    let source_selector = &scraper::Selector::parse("source").unwrap();
+    let caption_selector = scraper::Selector::parse(".Theme-Caption.Layout").unwrap();
+    let caption_nodes: Vec<_> = document.select(&caption_selector).collect();
+
+    let mut article = String::new();
+    let mut img_urls = Vec::new();
+    for element in document.select(&selector) {
+        if element.value().name() == "picture" {
+            let mut urls = HashSet::new();
+            for source in element.select(source_selector) {
+                if let Some(srcset) = source.value().attr("data-srcset") {
+                    let img_url = srcset
+                        .split(',')
+                        .map(|s| s.trim())
+                        .last()
+                        .and_then(|s| s.split_whitespace().next())
+                        .unwrap();
+                    urls.insert(img_url);
+                }
+            }
+
+            if urls.len() > 1 {
+                for url in urls {
+                    if url.ends_with("webp") {
+                        continue;
+                    }
+                    let img_prefix = web_url.trim_end_matches("index.html");
+                    let i = url.trim_start_matches("./");
+                    let img_url = format!("{img_prefix}{i}");
+                    let img_name = url.trim_start_matches("./assets/").replace('/', "_");
+                    let img_path = PathBuf::from("imgs");
+                    let img_path = img_path.join(img_name);
+                    article.push_str(&format!("<img src=\"/{}\" />\n", img_path.display()));
+                    img_urls.push((img_url, img_path));
+                    break;
+                }
+            }
+        } else if element.value().name() == "div" {
+            if let Some(caption) = element
+                .select(&scraper::Selector::parse("div.Theme-Caption.Layout > div").unwrap())
+                .next()
+            {
+                let caption_html = caption.text().collect::<Vec<_>>().join("");
+                article.push_str(&format!("<div class=\"caption\">{}</div>\n", caption_html));
+            }
+        } else if element.value().name() == "p" {
+            let p = element.inner_html();
+            if caption_nodes
+                .iter()
+                .any(|cap| cap.text().any(|_| cap.html().contains(&p)))
+            {
+                continue;
+            }
+            article.push_str(&format!("<p>{}</p>\n", p));
+        } else {
+            let html_fragment = element.html();
+            article.push_str(&html_fragment);
+            article.push_str("\n");
+        }
+    }
+
+    (article, img_urls)
 }

@@ -65,8 +65,9 @@
                 <div>{{ content }}</div>
                 {%- when crate::ContentType::Quote with (content) %}
                 <blockquote>{{ content }}</blockquote>
-                {%- when crate::ContentType::CustomEmbed with (url) %}
+                {%- when crate::ContentType::CustomEmbed with (url, content) %}
                 <div><a href="{{ url }}">{{ url }}</a></div>
+                <div>{{ content }}</div>
                 {%- when crate::ContentType::Other %}
                 {%- endmatch %}
             {%- endfor %}
