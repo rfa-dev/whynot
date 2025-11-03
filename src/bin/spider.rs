@@ -262,21 +262,22 @@ async fn extract_article(web_url: &str) -> (String, Vec<(String, PathBuf)>) {
                 }
             }
 
-            if urls.len() > 1 {
-                for url in urls {
-                    if url.ends_with("webp") {
-                        continue;
-                    }
-                    let img_prefix = web_url.trim_end_matches("index.html");
-                    let i = url.trim_start_matches("./");
-                    let img_url = format!("{img_prefix}{i}");
-                    let img_name = url.trim_start_matches("./assets/").replace('/', "_");
-                    let img_path = PathBuf::from("imgs");
-                    let img_path = img_path.join(img_name);
-                    article.push_str(&format!("<img src=\"/{}\" />\n", img_path.display()));
-                    img_urls.push((img_url, img_path));
-                    break;
+            for url in urls {
+                if url.ends_with("webp") {
+                    continue;
                 }
+                let img_prefix = web_url.trim_end_matches("index.html");
+                let i = url.trim_start_matches("./");
+                let img_url = format!("{img_prefix}{i}");
+                let mut img_name = url.trim_start_matches("./assets/").replace('/', "_");
+                if img_name.len() > 200 {
+                    img_name = img_name.split_at(100).1.to_owned();
+                }
+                let img_path = PathBuf::from("imgs");
+                let img_path = img_path.join(img_name);
+                article.push_str(&format!("<img src=\"/{}\" />\n", img_path.display()));
+                img_urls.push((img_url, img_path));
+                break;
             }
         } else if element.value().name() == "div" {
             if let Some(caption) = element
