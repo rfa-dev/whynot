@@ -93,7 +93,7 @@ async fn fetch_section(
 const CDN_DOMAIN: &str = "https://cloudfront-us-east-1.images.arcpublishing.com/radiofreeasia/";
 
 async fn batch_dl(
-    items: &mut Vec<Value>,
+    items: &mut [Value],
     keyspace: &Keyspace,
     db: &PartitionHandle,
     index: &PartitionHandle,
@@ -180,7 +180,7 @@ async fn batch_dl(
                         .unwrap()
                         .trim_matches('/')
                         .to_owned();
-                    let key = tag_key(&path, &website_url, display_date);
+                    let key = tag_key(&path, website_url, display_date);
                     batch.insert(tags, key, []);
                 }
             }
@@ -255,7 +255,7 @@ async fn extract_article(web_url: &str) -> (String, Vec<(String, PathBuf)>) {
                     let img_url = srcset
                         .split(',')
                         .map(|s| s.trim())
-                        .last()
+                        .next_back()
                         .and_then(|s| s.split_whitespace().next())
                         .unwrap();
                     urls.insert(img_url);
@@ -299,7 +299,7 @@ async fn extract_article(web_url: &str) -> (String, Vec<(String, PathBuf)>) {
         } else {
             let html_fragment = element.html();
             article.push_str(&html_fragment);
-            article.push_str("\n");
+            article.push('\n');
         }
     }
 
