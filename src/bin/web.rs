@@ -21,7 +21,7 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use whynot::{get_filename_from_url, kv_sep_partition_option};
 
-/// RFA backup website
+/// WHYNOT backup website
 #[derive(Parser, Debug)]
 struct Args {
     /// listening address
