@@ -297,6 +297,15 @@ blockquote {
     color: #555;
 }
 
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+.caption {
+    text-align: center;
+}
+
 .source a {
     color: #1d4ed8;
     text-decoration: none;
