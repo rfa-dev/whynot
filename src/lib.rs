@@ -28,7 +28,7 @@ pub fn tag_key(tag_path: &str, website_url: &str, display_date: &str) -> Vec<u8>
     key.extend_from_slice(tag_path.as_bytes());
     key.push(b'|');
     key.extend_from_slice(&ts_byte);
-    key.extend_from_slice(&website_url.as_bytes());
+    key.extend_from_slice(website_url.as_bytes());
 
     key
 }
