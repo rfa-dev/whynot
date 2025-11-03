@@ -320,7 +320,7 @@ async fn list(
     let url_path = format!("/");
     let page_list = PageList {
         items,
-        page: page + 1,
+        page,
         url_path,
     };
     into_response(&page_list)
