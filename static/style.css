@@ -306,6 +306,14 @@ img {
     text-align: center;
 }
 
+img + .caption {
+  margin-top: -5px !important;
+}
+
+.caption + img {
+  margin-top: 20px !important;
+}
+
 .source a {
     color: #1d4ed8;
     text-decoration: none;
