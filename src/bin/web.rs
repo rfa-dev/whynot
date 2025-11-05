@@ -115,6 +115,11 @@ async fn page(
             items.push(item);
         }
 
+        if items.is_empty() {
+            error!("no items found for tag: {key}");
+            return StatusCode::NOT_FOUND.into_response();
+        }
+
         let url_path = format!("/{key}");
         let page_list = PageList {
             items,
